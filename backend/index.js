@@ -23,7 +23,7 @@ app.use(cookieParser());
 
 const allowedOrigins = [
     "http://localhost:3000",
-    "https://silly-cassata-3b5f36.netlify.app"
+    "https://study-sphere-012.netlify.app"
 ];
 
 app.use(cors({

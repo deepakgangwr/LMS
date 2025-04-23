@@ -21,19 +21,32 @@ const PORT = process.env.PORT || 3000;
 app.use(express.json());
 app.use(cookieParser());
 
+const allowedOrigins = [
+    "http://localhost:3000",
+    "https://silly-cassata-3b5f36.netlify.app"
+];
+
 app.use(cors({
-    origin:"*",
-    credentials:true
+    origin: function (origin, callback) {
+        if (!origin || allowedOrigins.includes(origin)) {
+            callback(null, true);
+        } else {
+            callback(new Error("Not allowed by CORS"));
+        }
+    },
+    credentials: true,
 }));
- 
+
+
+
 // apis
 app.use("/api/v1/media", mediaRoute);
 app.use("/api/v1/user", userRoute);
 app.use("/api/v1/course", courseRoute);
 app.use("/api/v1/purchase", purchaseRoute);
 app.use("/api/v1/progress", courseProgressRoute);
- 
- 
+
+
 app.listen(PORT, () => {
     console.log(`Server listen at port ${PORT}`);
 })

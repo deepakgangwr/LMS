@@ -50,7 +50,7 @@ const Navbar = () => {
           <School size={"30"} />
           <Link to="/">
             <h1 className="hidden md:block font-extrabold text-2xl">
-              E-Learning
+            𝓼𝓽𝓾𝓭𝔂-𝒔𝒑𝒉𝒆𝒓𝒆
             </h1>
           </Link>
         </div>

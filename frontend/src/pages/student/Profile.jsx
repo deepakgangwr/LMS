@@ -80,7 +80,7 @@ const Profile = () => {
           <div className="relative group">
             <Avatar className="h-32 w-32 border-4 border-white shadow-xl">
               <AvatarImage
-                src={user?.photoUrl || "https://github.com/shadcn.png"}
+                src={user?.photoUrl || ""}
                 alt={user.name}
                 className="object-cover"
               />

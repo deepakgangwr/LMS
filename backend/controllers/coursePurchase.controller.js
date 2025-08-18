@@ -1,141 +1,118 @@
-import Stripe from "stripe";
+import Razorpay from "razorpay";
+import crypto from "crypto";
 import { Course } from "../models/course.model.js";
 import { CoursePurchase } from "../models/coursePurchase.model.js";
 import { Lecture } from "../models/lecture.model.js";
 import { User } from "../models/user.model.js";
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+const razorpay = new Razorpay({
+	key_id: process.env.RAZORPAY_KEY_ID,
+	key_secret: process.env.RAZORPAY_KEY_SECRET,
+});
 
 export const createCheckoutSession = async (req, res) => {
-  try {
-    const userId = req.id;
-    const { courseId } = req.body;
+	try {
+		const userId = req.id;
+		const { courseId } = req.body;
 
-    const course = await Course.findById(courseId);
-    if (!course) return res.status(404).json({ message: "Course not found!" });
+		const course = await Course.findById(courseId);
+		if (!course) return res.status(404).json({ message: "Course not found!" });
 
-    // Create a new course purchase record
-    const newPurchase = new CoursePurchase({
-      courseId,
-      userId,
-      amount: course.coursePrice,
-      status: "pending",
-    });
+		// Create a new course purchase record in pending state
+		const newPurchase = new CoursePurchase({
+			courseId,
+			userId,
+			amount: course.coursePrice,
+			status: "pending",
+		});
 
-    // Create a Stripe checkout session
-    const session = await stripe.checkout.sessions.create({
-      payment_method_types: ["card"],
-      line_items: [
-        {
-          price_data: {
-            currency: "inr",
-            product_data: {
-              name: course.courseTitle,
-              images: [course.courseThumbnail],
-            },
-            unit_amount: course.coursePrice * 100, // Amount in paise (lowest denomination)
-          },
-          quantity: 1,
-        },
-      ],
-      mode: "payment",
-      success_url: `http://localhost:5173/course-progress/${courseId}`, // once payment successful redirect to course progress page
-      cancel_url: `http://localhost:5173/course-detail/${courseId}`,
-      metadata: {
-        courseId: courseId,
-        userId: userId,
-      },
-      shipping_address_collection: {
-        allowed_countries: ["IN"], // Optionally restrict allowed countries
-      },
-    });
+		// Create a Razorpay order (amount in paise)
+		const order = await razorpay.orders.create({
+			amount: course.coursePrice * 100,
+			currency: "INR",
+			receipt: `rcpt_${newPurchase._id}`,
+			notes: { courseId: String(courseId), userId: String(userId) },
+		});
 
-    if (!session.url) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Error while creating session" });
-    }
+		// Save the purchase record with the order id
+		newPurchase.paymentId = order.id;
+		await newPurchase.save();
 
-    // Save the purchase record
-    newPurchase.paymentId = session.id;
-    await newPurchase.save();
-
-    return res.status(200).json({
-      success: true,
-      url: session.url, // Return the Stripe checkout URL
-    });
-  } catch (error) {
-    console.log(error);
-  }
+		return res.status(200).json({
+			success: true,
+			keyId: process.env.RAZORPAY_KEY_ID,
+			orderId: order.id,
+			amount: order.amount,
+			currency: order.currency,
+			courseTitle: course.courseTitle,
+		});
+ 	} catch (error) {
+ 		console.log(error);
+ 		return res.status(500).json({ success: false, message: "Failed to create order" });
+ 	}
 };
 
-export const stripeWebhook = async (req, res) => {
-  let event;
+export const verifyPayment = async (req, res) => {
+ 	try {
+ 		const userId = req.id;
+ 		const { razorpay_order_id, razorpay_payment_id, razorpay_signature, courseId } = req.body;
 
-  try {
-    const payloadString = JSON.stringify(req.body, null, 2);
-    const secret = process.env.WEBHOOK_ENDPOINT_SECRET;
+ 		if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
+ 			return res.status(400).json({ success: false, message: "Missing payment details" });
+ 		}
 
-    const header = stripe.webhooks.generateTestHeaderString({
-      payload: payloadString,
-      secret,
-    });
+ 		const generatedSignature = crypto
+ 			.createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
+ 			.update(`${razorpay_order_id}|${razorpay_payment_id}`)
+ 			.digest("hex");
 
-    event = stripe.webhooks.constructEvent(payloadString, header, secret);
-  } catch (error) {
-    console.error("Webhook error:", error.message);
-    return res.status(400).send(`Webhook error: ${error.message}`);
-  }
+ 		if (generatedSignature !== razorpay_signature) {
+ 			// mark failed
+ 			await CoursePurchase.findOneAndUpdate(
+ 				{ paymentId: razorpay_order_id, userId },
+ 				{ status: "failed" }
+ 			);
+ 			return res.status(400).json({ success: false, message: "Payment verification failed" });
+ 		}
 
-  // Handle the checkout session completed event
-  if (event.type === "checkout.session.completed") {
-    console.log("check session complete is called");
+ 		// Mark purchase as completed and enroll user
+ 		const purchase = await CoursePurchase.findOneAndUpdate(
+ 			{ paymentId: razorpay_order_id, userId },
+ 			{ status: "completed" },
+ 			{ new: true }
+ 		).populate({ path: "courseId" });
 
-    try {
-      const session = event.data.object;
+ 		if (!purchase) {
+ 			return res.status(404).json({ success: false, message: "Purchase not found" });
+ 		}
 
-      const purchase = await CoursePurchase.findOne({
-        paymentId: session.id,
-      }).populate({ path: "courseId" });
+ 		// Make all lectures visible by setting `isPreviewFree` to true
+ 		if (purchase.courseId && purchase.courseId.lectures.length > 0) {
+ 			await Lecture.updateMany(
+ 				{ _id: { $in: purchase.courseId.lectures } },
+ 				{ $set: { isPreviewFree: true } }
+ 			);
+ 		}
 
-      if (!purchase) {
-        return res.status(404).json({ message: "Purchase not found" });
-      }
+ 		// Update user's enrolledCourses
+ 		await User.findByIdAndUpdate(
+ 			purchase.userId,
+ 			{ $addToSet: { enrolledCourses: purchase.courseId._id } },
+ 			{ new: true }
+ 		);
 
-      if (session.amount_total) {
-        purchase.amount = session.amount_total / 100;
-      }
-      purchase.status = "completed";
+ 		// Update course to add user ID to enrolledStudents
+ 		await Course.findByIdAndUpdate(
+ 			purchase.courseId._id,
+ 			{ $addToSet: { enrolledStudents: purchase.userId } },
+ 			{ new: true }
+ 		);
 
-      // Make all lectures visible by setting `isPreviewFree` to true
-      if (purchase.courseId && purchase.courseId.lectures.length > 0) {
-        await Lecture.updateMany(
-          { _id: { $in: purchase.courseId.lectures } },
-          { $set: { isPreviewFree: true } }
-        );
-      }
-
-      await purchase.save();
-
-      // Update user's enrolledCourses
-      await User.findByIdAndUpdate(
-        purchase.userId,
-        { $addToSet: { enrolledCourses: purchase.courseId._id } }, // Add course ID to enrolledCourses
-        { new: true }
-      );
-
-      // Update course to add user ID to enrolledStudents
-      await Course.findByIdAndUpdate(
-        purchase.courseId._id,
-        { $addToSet: { enrolledStudents: purchase.userId } }, // Add user ID to enrolledStudents
-        { new: true }
-      );
-    } catch (error) {
-      console.error("Error handling event:", error);
-      return res.status(500).json({ message: "Internal Server Error" });
-    }
-  }
-  res.status(200).send();
+ 		return res.status(200).json({ success: true });
+ 	} catch (error) {
+ 		console.log(error);
+ 		return res.status(500).json({ success: false, message: "Internal Server Error" });
+ 	}
 };
 export const getCourseDetailWithPurchaseStatus = async (req, res) => {
   try {

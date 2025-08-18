@@ -116,13 +116,13 @@ const Navbar = () => {
                 <DropdownMenuSeparator />
                 <DropdownMenuGroup>
                   <DropdownMenuItem className="rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors duration-200">
-                    <Link to="my-learning" className="flex w-full items-center">
+                    <Link to="/my-learning" className="flex w-full items-center">
                       <GraduationCap className="h-4 w-4 mr-2" />
                       My learning
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuItem className="rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors duration-200">
-                    <Link to="profile" className="flex w-full items-center">
+                    <Link to="/profile" className="flex w-full items-center">
                       <Avatar className="h-4 w-4 mr-2" />
                       Edit Profile
                     </Link>

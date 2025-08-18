@@ -16,6 +16,8 @@ import EditLecture from "./pages/admin/lecture/EditLecture";
 import CourseDetail from "./pages/student/CourseDetail";
 import CourseProgress from "./pages/student/CourseProgress";
 import SearchPage from "./pages/student/SearchPage";
+import About from "./pages/student/About";
+import Contact from "./pages/student/Contact";
 import {
   AdminRoute,
   AuthenticatedUser,
@@ -37,6 +39,18 @@ const appRouter = createBrowserRouter([
             <Courses />
           </>
         ),
+      },
+      {
+        path: "courses",
+        element: <Courses />,
+      },
+      {
+        path: "about",
+        element: <About />,
+      },
+      {
+        path: "contact",
+        element: <Contact />,
       },
       {
         path: "login",

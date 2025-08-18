@@ -1,29 +1,58 @@
 import React, { useEffect } from "react";
 import { Button } from "./ui/button";
-import { useCreateCheckoutSessionMutation } from "@/features/api/purchaseApi";
+import { useCreateCheckoutSessionMutation, useVerifyPaymentMutation } from "@/features/api/purchaseApi";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 const BuyCourseButton = ({ courseId }) => {
-  const [createCheckoutSession, {data, isLoading, isSuccess, isError, error }] =
-    useCreateCheckoutSessionMutation();
+  const [createCheckoutSession, {data, isLoading, isSuccess, isError, error }] = useCreateCheckoutSessionMutation();
+  const [verifyPayment] = useVerifyPaymentMutation();
 
   const purchaseCourseHandler = async () => {
     await createCheckoutSession(courseId);
   };
 
-  useEffect(()=>{
-    if(isSuccess){
-       if(data?.url){
-        window.location.href = data.url; // Redirect to stripe checkout url
-       }else{
-        toast.error("Invalid response from server.")
-       }
-    } 
-    if(isError){
-      toast.error(error?.data?.message || "Failed to create checkout session")
+  useEffect(() => {
+    const launchRazorpayCheckout = async () => {
+      if (!data || !data.orderId) return;
+      const options = {
+        key: data.keyId,
+        amount: data.amount,
+        currency: data.currency || "INR",
+        name: data.courseTitle || "Course Purchase",
+        order_id: data.orderId,
+        handler: async function (response) {
+          const payload = {
+            razorpay_order_id: response.razorpay_order_id,
+            razorpay_payment_id: response.razorpay_payment_id,
+            razorpay_signature: response.razorpay_signature,
+            courseId,
+          };
+          const res = await verifyPayment(payload);
+          if (res?.data?.success) {
+            window.location.href = `/course-progress/${courseId}`;
+          } else {
+            toast.error(res?.error?.data?.message || "Payment verification failed");
+          }
+        },
+        theme: { color: "#3399cc" },
+      };
+
+      if (typeof window.Razorpay === "undefined") {
+        toast.error("Razorpay SDK not loaded");
+        return;
+      }
+      const rzp = new window.Razorpay(options);
+      rzp.open();
+    };
+
+    if (isSuccess) {
+      launchRazorpayCheckout();
     }
-  },[data, isSuccess, isError, error])
+    if (isError) {
+      toast.error(error?.data?.message || "Failed to create order");
+    }
+  }, [data, isSuccess, isError, error, courseId, verifyPayment]);
 
   return (
     <Button

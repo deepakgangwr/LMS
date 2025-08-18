@@ -5,14 +5,17 @@ export const generateToken = (res, user, message) => {
     expiresIn: "1d",
   });
 
+  const isProduction = process.env.NODE_ENV === "production";
+  const cookieOptions = {
+    httpOnly: true,
+    sameSite: isProduction ? "none" : "lax",
+    secure: isProduction, // only true on https in production
+    maxAge: 24 * 60 * 60 * 1000,
+  };
+
   return res
     .status(200)
-    .cookie("token", token, {
-      httpOnly: true,
-      sameSite: "none", // Change from "strict" to "none" for cross-site requests
-      secure: true, // Required when sameSite is "none"
-      maxAge: 24 * 60 * 60 * 1000, // 1 day
-    }).json({
+    .cookie("token", token, cookieOptions).json({
         success:true,
         message,
         user

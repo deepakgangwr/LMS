@@ -51,7 +51,7 @@ const Courses = () => {
           </motion.p>
         </div>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
           {isLoading ? (
             Array.from({ length: 8 }).map((_, index) => (
               <CourseSkeleton key={index} />
@@ -60,6 +60,7 @@ const Courses = () => {
             data?.courses && data.courses.map((course, index) => (
               <motion.div
                 key={course._id}
+                className="h-full"
                 initial={{ opacity: 0, y: 20 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
@@ -98,25 +99,37 @@ export default Courses;
 
 const CourseSkeleton = () => {
   return (
-    <div className="bg-white dark:bg-gray-800 shadow-md rounded-xl overflow-hidden">
-      <Skeleton className="w-full h-48" />
-      <div className="px-5 py-4 space-y-4">
+    <div className="rounded-xl overflow-hidden border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800/50 shadow-lg h-full">
+      <Skeleton className="h-48 w-full" />
+      <div className="p-5 space-y-4">
         <Skeleton className="h-6 w-3/4" />
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Skeleton className="h-8 w-8 rounded-full" />
-            <Skeleton className="h-4 w-20" />
-          </div>
-          <Skeleton className="h-4 w-16" />
+        <Skeleton className="h-4 w-full" />
+        <Skeleton className="h-4 w-5/6" />
+        
+        {/* Tags skeleton */}
+        <div className="flex gap-1">
+          <Skeleton className="h-4 w-16 rounded-full" />
+          <Skeleton className="h-4 w-16 rounded-full" />
+          <Skeleton className="h-4 w-16 rounded-full" />
         </div>
-        <Skeleton className="h-4 w-1/4" />
-        <div className="flex justify-between items-center pt-2">
+        
+        {/* Instructor skeleton with better styling */}
+        <div className="p-2 rounded-lg bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-700/30 dark:to-gray-800/30">
+          <div className="flex items-center gap-2">
+            <Skeleton className="h-10 w-10 rounded-full" />
+            <div className="space-y-1">
+              <Skeleton className="h-4 w-24" />
+              <Skeleton className="h-3 w-16" />
+            </div>
+          </div>
+        </div>
+        
+        <div className="flex justify-between items-center pt-3 border-t border-gray-100 dark:border-gray-700">
           <Skeleton className="h-6 w-16" />
-          <div className="flex gap-2">
-            <Skeleton className="h-4 w-8 rounded-full" />
-            <Skeleton className="h-4 w-8 rounded-full" />
-          </div>
+          <Skeleton className="h-6 w-20 rounded-full" />
         </div>
+        
+        <Skeleton className="h-9 w-full rounded-lg" />
       </div>
     </div>
   );

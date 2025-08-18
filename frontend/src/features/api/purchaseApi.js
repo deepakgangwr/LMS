@@ -1,7 +1,7 @@
 import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
 
 // const COURSE_PURCHASE_API = "https://lms-yo4y.onrender.com/api/v1/purchase";
-const COURSE_PURCHASE_API = "http://localhost:8080/api/v1/purchase";
+const COURSE_PURCHASE_API = "/api/v1/purchase";
 
 export const purchaseApi = createApi({
   reducerPath: "purchaseApi",
@@ -15,6 +15,13 @@ export const purchaseApi = createApi({
         url: "/checkout/create-checkout-session",
         method: "POST",
         body: { courseId },
+      }),
+    }),
+    verifyPayment: builder.mutation({
+      query: (payload) => ({
+        url: "/verify",
+        method: "POST",
+        body: payload,
       }),
     }),
     getCourseDetailWithStatus: builder.query({
@@ -34,6 +41,7 @@ export const purchaseApi = createApi({
 
 export const {
   useCreateCheckoutSessionMutation,
+  useVerifyPaymentMutation,
   useGetCourseDetailWithStatusQuery,
   useGetPurchasedCoursesQuery,
 } = purchaseApi;
